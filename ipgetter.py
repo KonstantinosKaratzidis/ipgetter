@@ -27,9 +27,13 @@ API Usage
 import re
 import random
 import signal
-
+from sys import stdout, stderr
 from sys import version_info
 from functools import wraps
+from os import path
+
+
+DEFAULT_SERVER_LIST_LOCATION=path.join(path.abspath("."), "server-list")
 
 PY3K = version_info >= (3, 0)
 
@@ -66,6 +70,37 @@ def timeout(seconds, error_message='Function call timed out'):
 def myip():
     return IPgetter().get_externalip()
 
+def get_server_list(server_file = None):
+    locations = [DEFAULT_SERVER_LIST_LOCATION]
+    if server_file:
+        locations.insert(0, server_file)
+
+    for fname in locations:
+        try:
+            list_file = open(fname)
+            break
+        except FileNotFoundError:
+            print("ERROR: '{}', file not found".format(fname), file = stderr)
+        except:
+            print("ERROR: Could not open file '{}'".format(fname))
+
+    if not list_file:
+        print("Could not open a server list file successfully", file = stderr)
+        print("Exiting ...", file = stderr)
+        exit(1)
+
+    server_list = []
+
+    line = list_file.readline()
+    while line != "": # TODO maybe make this a seperate function that also does some regex checking
+        line = line.strip()
+        if len(line) != 0 and not line.startswith("#"):
+            server_list.append(line)
+        line = list_file.readline()
+    list_file.close()
+    
+    return server_list
+
 
 class IPgetter(object):
 
@@ -76,54 +111,8 @@ class IPgetter(object):
     on a single server
     '''
 
-    def __init__(self):
-        self.server_list = ['http://ip.dnsexit.com',
-                            'http://ifconfig.me/ip',
-                            'http://ipecho.net/plain',
-                            'http://checkip.dyndns.org/plain',
-                            'http://ipogre.com/linux.php',
-                            'http://whatismyipaddress.com/',
-                            'http://ip.my-proxy.com/',
-                            'http://websiteipaddress.com/WhatIsMyIp',
-                            'http://getmyipaddress.org/',
-                            'http://showmyipaddress.com/',
-                            'http://www.my-ip-address.net/',
-                            'http://myexternalip.com/raw',
-                            'http://www.canyouseeme.org/',
-                            'http://www.trackip.net/',
-                            'http://myip.dnsdynamic.org/',
-                            'http://icanhazip.com/',
-                            'http://www.iplocation.net/',
-                            'http://www.howtofindmyipaddress.com/',
-                            'http://www.ipchicken.com/',
-                            'http://whatsmyip.net/',
-                            'http://www.ip-adress.com/',
-                            'http://checkmyip.com/',
-                            'http://www.tracemyip.org/',
-                            'http://checkmyip.net/',
-                            'http://www.lawrencegoetz.com/programs/ipinfo/',
-                            'http://www.findmyip.co/',
-                            'http://ip-lookup.net/',
-                            'http://www.dslreports.com/whois',
-                            'http://www.mon-ip.com/en/my-ip/',
-                            'http://www.myip.ru',
-                            'http://ipgoat.com/',
-                            'http://www.myipnumber.com/my-ip-address.asp',
-                            'http://www.whatsmyipaddress.net/',
-                            'http://formyip.com/',
-                            'https://check.torproject.org/',
-                            'http://www.displaymyip.com/',
-                            'http://www.bobborst.com/tools/whatsmyip/',
-                            'http://www.geoiptool.com/',
-                            'https://www.whatsmydns.net/whats-my-ip-address.html',
-                            'https://www.privateinternetaccess.com/pages/whats-my-ip/',
-                            'http://checkip.dyndns.com/',
-                            'http://myexternalip.com/',
-                            'http://www.ip-adress.eu/',
-                            'http://www.infosniper.net/',
-                            'http://wtfismyip.com/',
-                            'http://ipinfo.io/',
-                            'http://httpbin.org/ip']
+    def __init__(self, server_file = None):
+        self.server_list = get_server_list(server_file)
 
     def get_externalip(self):
         '''
