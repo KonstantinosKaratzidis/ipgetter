@@ -23,16 +23,13 @@ API Usage
     8.8.8.8 = 47 ocurrencies
 
 """
-
 import re
 import random
 import signal
-
-from sys import version_info
+from sys import stderr, version_info
 from functools import wraps
 
 PY3K = version_info >= (3, 0)
-
 if PY3K:
     import urllib.request as urllib
 else:
@@ -40,6 +37,54 @@ else:
 
 __version__ = "0.4"
 
+DEFAULT_SERVERS = ['http://ip.dnsexit.com',
+    'http://ifconfig.me/ip',
+    'http://ipecho.net/plain',
+    'http://checkip.dyndns.org/plain',
+    'http://ipogre.com/linux.php',
+    'http://whatismyipaddress.com/',
+    'http://ip.my-proxy.com/',
+    'http://websiteipaddress.com/WhatIsMyIp',
+    'http://getmyipaddress.org/',
+    'http://showmyipaddress.com/',
+    'http://www.my-ip-address.net/',
+    'http://myexternalip.com/raw',
+    'http://www.canyouseeme.org/',
+    'http://www.trackip.net/',
+    'http://myip.dnsdynamic.org/',
+    'http://icanhazip.com/',
+    'http://www.iplocation.net/',
+    'http://www.howtofindmyipaddress.com/',
+    'http://www.ipchicken.com/',
+    'http://whatsmyip.net/',
+    'http://www.ip-adress.com/',
+    'http://checkmyip.com/',
+    'http://www.tracemyip.org/',
+    'http://checkmyip.net/',
+    'http://www.lawrencegoetz.com/programs/ipinfo/',
+    'http://www.findmyip.co/',
+    'http://ip-lookup.net/',
+    'http://www.dslreports.com/whois',
+    'http://www.mon-ip.com/en/my-ip/',
+    'http://www.myip.ru',
+    'http://ipgoat.com/',
+    'http://www.myipnumber.com/my-ip-address.asp',
+    'http://www.whatsmyipaddress.net/',
+    'http://formyip.com/',
+    'https://check.torproject.org/',
+    'http://www.displaymyip.com/',
+    'http://www.bobborst.com/tools/whatsmyip/',
+    'http://www.geoiptool.com/',
+    'https://www.whatsmydns.net/whats-my-ip-address.html',
+    'https://www.privateinternetaccess.com/pages/whats-my-ip/',
+    'http://checkip.dyndns.com/',
+    'http://myexternalip.com/',
+    'http://www.ip-adress.eu/',
+    'http://www.infosniper.net/',
+    'http://wtfismyip.com/',
+    'http://ipinfo.io/',
+    'http://httpbin.org/ip'
+]
 
 def timeout(seconds, error_message='Function call timed out'):
     '''
@@ -66,6 +111,33 @@ def timeout(seconds, error_message='Function call timed out'):
 def myip():
     return IPgetter().get_externalip()
 
+class ServerListNotFound(Exception):
+    pass
+
+def get_server_list(fname = None, raise_error = False):
+    if not fname: 
+        return DEFAULT_SERVERS
+
+    try:
+        server_list = []
+
+        # TODO maybe make this a seperate function that also does some regex checking
+        with open(fname) as list_file:
+            line = list_file.readline()
+            while line != "":
+                line = line.strip()
+                if len(line) != 0 and not line.startswith("#"):
+                    server_list.append(line)
+                line = list_file.readline()
+        
+    except:
+        print("Could not open server file.", file = stderr)
+        if raise_error:
+            raise ServerListNotFound
+        return DEFAULT_SERVERS
+    
+    return server_list
+
 
 class IPgetter(object):
 
@@ -76,54 +148,8 @@ class IPgetter(object):
     on a single server
     '''
 
-    def __init__(self):
-        self.server_list = ['http://ip.dnsexit.com',
-                            'http://ifconfig.me/ip',
-                            'http://ipecho.net/plain',
-                            'http://checkip.dyndns.org/plain',
-                            'http://ipogre.com/linux.php',
-                            'http://whatismyipaddress.com/',
-                            'http://ip.my-proxy.com/',
-                            'http://websiteipaddress.com/WhatIsMyIp',
-                            'http://getmyipaddress.org/',
-                            'http://showmyipaddress.com/',
-                            'http://www.my-ip-address.net/',
-                            'http://myexternalip.com/raw',
-                            'http://www.canyouseeme.org/',
-                            'http://www.trackip.net/',
-                            'http://myip.dnsdynamic.org/',
-                            'http://icanhazip.com/',
-                            'http://www.iplocation.net/',
-                            'http://www.howtofindmyipaddress.com/',
-                            'http://www.ipchicken.com/',
-                            'http://whatsmyip.net/',
-                            'http://www.ip-adress.com/',
-                            'http://checkmyip.com/',
-                            'http://www.tracemyip.org/',
-                            'http://checkmyip.net/',
-                            'http://www.lawrencegoetz.com/programs/ipinfo/',
-                            'http://www.findmyip.co/',
-                            'http://ip-lookup.net/',
-                            'http://www.dslreports.com/whois',
-                            'http://www.mon-ip.com/en/my-ip/',
-                            'http://www.myip.ru',
-                            'http://ipgoat.com/',
-                            'http://www.myipnumber.com/my-ip-address.asp',
-                            'http://www.whatsmyipaddress.net/',
-                            'http://formyip.com/',
-                            'https://check.torproject.org/',
-                            'http://www.displaymyip.com/',
-                            'http://www.bobborst.com/tools/whatsmyip/',
-                            'http://www.geoiptool.com/',
-                            'https://www.whatsmydns.net/whats-my-ip-address.html',
-                            'https://www.privateinternetaccess.com/pages/whats-my-ip/',
-                            'http://checkip.dyndns.com/',
-                            'http://myexternalip.com/',
-                            'http://www.ip-adress.eu/',
-                            'http://www.infosniper.net/',
-                            'http://wtfismyip.com/',
-                            'http://ipinfo.io/',
-                            'http://httpbin.org/ip']
+    def __init__(self, server_file = None):
+        self.server_list = get_server_list(server_file)
 
     def get_externalip(self):
         '''
@@ -190,6 +216,7 @@ class IPgetter(object):
             print('{0} = {1} ocurrenc{2}'.format(ip if len(ip) > 0 else 'broken server', ocorrencia, 'y' if ocorrencia == 1 else 'ies'))
         print('\n')
         print(resultdict)
+
 
 if __name__ == '__main__':
     print(myip())
