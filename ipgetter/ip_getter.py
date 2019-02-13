@@ -35,8 +35,6 @@ if PY3K:
 else:
     import urllib2 as urllib
 
-__version__ = "0.4"
-
 DEFAULT_SERVERS = ['http://ip.dnsexit.com',
     'http://ifconfig.me/ip',
     'http://ipecho.net/plain',
