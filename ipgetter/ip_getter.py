@@ -37,31 +37,6 @@ if PY3K:
 else:
     import urllib2 as urllib
 
-def timeout(seconds, error_message='Function call timed out'):
-    '''
-    Decorator that provides timeout to a function
-    '''
-    def decorated(func):
-        def _handle_timeout(signum, frame):
-            raise TimeoutError(error_message)
-
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            signal.signal(signal.SIGALRM, _handle_timeout)
-            signal.alarm(seconds)
-            try:
-                result = func(*args, **kwargs)
-            finally:
-                signal.alarm(0)
-            return result
-        return wrapper
-    return decorated
-
-
-@timeout(120)
-def myip():
-    return IPgetter().get_externalip()
-
 class ServerListNotFound(Exception):
     pass
 
@@ -89,6 +64,14 @@ def get_server_list(fname = None, raise_error = False):
     
     return server_list
 
+def timeout_handler(signum, frame):
+    raise ConnectionTimeout
+
+class ConnectionTimeout(Exception):
+    pass
+
+class MaxTimesExceeded(Exception):
+    pass
 
 class IPgetter(object):
 
@@ -102,20 +85,41 @@ class IPgetter(object):
     def __init__(self, server_file = None):
         self.server_list = get_server_list(server_file)
 
-    def get_externalip(self):
+    def get_externalip(self, timeout = 30, max_tries = 5):
         '''
-        This function gets your IP from a random server
+        This function gets your IP from a random server,
+        timeouts marks the time in seconds after which the function will
+        try to connect to another server, should the first one fail.
+        Setting max_tries to None will test all servers until an ip is found.
+        On failure MaxTimesExceeded is returned.
         '''
 
-        random.shuffle(self.server_list)
-        myip = ''
-        for server in self.server_list:
-            myip = self.fetch(server)
-            if myip != '':
+        def timeout_handler():
+            raise ConnectionTimeout
+
+        if max_tries is None:
+            servers = random.shuffle(self.server_list)
+        else:
+            servers = random.sample(self.server_list, max_tries)
+
+        signal.signal(signal.SIGALRM, timeout_handler)
+
+        for server in servers:
+            myip = None
+
+            signal.alarm(timeout)
+            try:
+                myip = self.fetch(server)
+            except ConnectionTimeout:
+                pass
+            finally:
+                signal.alarm(0)
+
+            if myip is not None:
                 return myip
-            else:
-                continue
-        return ''
+        
+        # if we didnt return an ip, it means we needed more tries than max_tries
+        raise MaxTimesExceeded
 
     def fetch(self, server):
         '''
@@ -141,9 +145,9 @@ class IPgetter(object):
                 '(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)',
                 content)
             myip = m.group(0)
-            return myip if len(myip) > 0 else ''
+            return myip if len(myip) > 0 else None
         except Exception:
-            return ''
+            return None
         finally:
             if url:
                 url.close()
